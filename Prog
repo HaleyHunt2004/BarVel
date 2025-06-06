@@ -1,0 +1,137 @@
+// Velocity Tracker with Bar Path Linearity Analysis
+// Side-view lift video analyzer with pink UI
+
+let video;
+let tracking = false;
+let dotX = 0, dotY = 0;
+let positions = [];
+let velocity = 0;
+let liftType = "Squat";
+
+function setup() {
+  createCanvas(640, 480);
+  textFont('Orbitron');
+  background('#F8BBD0');
+  textSize(16);
+
+  video = createCapture(VIDEO);
+  video.size(640, 480);
+  video.hide();
+
+  let uploadButton = createFileInput(handleFile);
+  uploadButton.position(20, 20);
+
+  let liftSelect = createSelect();
+  liftSelect.position(160, 20);
+  liftSelect.option("Squat");
+  liftSelect.option("Bench");
+  liftSelect.option("Deadlift");
+  liftSelect.changed(() => liftType = liftSelect.value());
+  liftSelect.style('background-color', '#EC407A');
+  liftSelect.style('color', 'white');
+
+  let resetButton = createButton("Reset");
+  resetButton.position(300, 20);
+  resetButton.mousePressed(() => {
+    positions = [];
+    tracking = false;
+  });
+  resetButton.style('background-color', '#AD1457');
+  resetButton.style('color', 'white');
+}
+
+function handleFile(file) {
+  if (file.type === 'video') {
+    video = createVideo([file.data], () => video.loop());
+    video.hide();
+  }
+}
+
+function draw() {
+  background('#F8BBD0');
+  image(video, 0, 0);
+
+  if (tracking) {
+    let currentX = mouseX;
+    let currentY = mouseY;
+    positions.push({ x: currentX, y: currentY, time: millis() });
+    drawPath();
+    calculateVelocity();
+    showData();
+  } else if (positions.length > 0) {
+    drawPath();
+    calculateVelocity();
+    showData();
+  }
+
+  drawUI();
+}
+
+function mousePressed() {
+  if (!tracking) {
+    dotX = mouseX;
+    dotY = mouseY;
+    positions = [];
+    tracking = true;
+  }
+}
+
+function drawPath() {
+  stroke('#C2185B');
+  noFill();
+  beginShape();
+  for (let pos of positions) {
+    vertex(pos.x, pos.y);
+  }
+  endShape();
+  fill('#AD1457');
+  noStroke();
+  ellipse(dotX, dotY, 10, 10);
+}
+
+function calculateVelocity() {
+  if (positions.length < 2) return;
+  let p1 = positions[positions.length - 2];
+  let p2 = positions[positions.length - 1];
+  let dx = p2.x - p1.x;
+  let dy = p2.y - p1.y;
+  let dt = (p2.time - p1.time) / 1000.0;
+  velocity = dist(p1.x, p1.y, p2.x, p2.y) / dt;
+}
+
+function showData() {
+  fill(255);
+  textAlign(LEFT);
+  textSize(14);
+  text(`Lift: ${liftType}`, 20, height - 60);
+  text(`Velocity: ${velocity.toFixed(2)} px/s`, 20, height - 40);
+  const linearity = calcLinearity();
+  const linearityColor = getLinearityColor(linearity);
+  fill(linearityColor);
+  text(`Bar Path Linearity: ${linearity.toFixed(2)}%`, 20, height - 20);
+}
+
+function calcLinearity() {
+  if (positions.length < 2) return 100;
+  let total = 0;
+  let verticals = 0;
+  for (let i = 1; i < positions.length; i++) {
+    total += dist(positions[i].x, positions[i].y, positions[i - 1].x, positions[i - 1].y);
+    verticals += abs(positions[i].y - positions[i - 1].y);
+  }
+  return (verticals / total) * 100;
+}
+
+function getLinearityColor(linearity) {
+  if (linearity > 95) return color('#4CAF50'); // green
+  else if (linearity > 85) return color('#FFC107'); // yellow
+  else return color('#F44336'); // red
+}
+
+function drawUI() {
+  // Decorative gears and digital styling
+  fill('#EC407A');
+  ellipse(600, 60, 40, 40);
+  ellipse(80, 440, 60, 60);
+  arc(320, 320, 100, 100, 0, PI / 2);
+}
